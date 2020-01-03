@@ -41,6 +41,26 @@ const fetchTestManifests = async (project, revision) => {
   return taskNameToManifests;
 };
 
+// Add to each job the field test_paths
+const addTestPathToJobs = async (jobs, { repository, revision }) => {
+  try {
+    const jobTypeNameToManifests = await fetchTestManifests(
+      repository,
+      revision,
+    );
+    let newJobs = [];
+    if (jobs.length > 0 && Object.keys(jobTypeNameToManifests).length > 0) {
+      newJobs = jobs.map(job => {
+        job.test_paths = jobTypeNameToManifests[job.job_type_name] || [];
+        return job;
+      });
+    }
+    return newJobs;
+  } catch (error) {
+    return jobs;
+  }
+};
+
 class Push extends React.PureComponent {
   constructor(props) {
     super(props);
@@ -164,7 +184,6 @@ class Push extends React.PureComponent {
 
   fetchJobs = async () => {
     const { push, notify } = this.props;
-    const manifests = await fetchTestManifests(push.repository, push.revision);
     const { data, failureStatus } = await JobModel.getList(
       {
         push_id: push.id,
@@ -172,8 +191,10 @@ class Push extends React.PureComponent {
       { fetchAll: true },
     );
 
+    const updatedJobs = await addTestPathToJobs(data, push);
+
     if (!failureStatus) {
-      this.mapPushJobs(data);
+      this.mapPushJobs(updatedJobs);
     } else {
       notify(failureStatus, 'danger', { sticky: true });
     }
