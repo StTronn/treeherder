@@ -29,6 +29,18 @@ import { RevisionList } from './RevisionList';
 const watchCycleStates = ['none', 'push', 'job', 'none'];
 const platformArray = Object.values(thPlatformMap);
 
+const fetchTestManifests = async (project, revision) => {
+  let taskNameToManifests = {};
+  const rootUrl = 'https://firefox-ci-tc.services.mozilla.com';
+  // XXX: This approach is known to not work for mozilla-central since there can be more than 1 decision task per push
+  const url = `${rootUrl}/api/index/v1/task/gecko.v2.${project}.revision.${revision}.firefox.decision/artifacts/public/manifests-by-task.json`;
+  const response = await fetch(url);
+  if (response.status === 200) {
+    taskNameToManifests = await response.json();
+  }
+  return taskNameToManifests;
+};
+
 class Push extends React.PureComponent {
   constructor(props) {
     super(props);
@@ -152,6 +164,7 @@ class Push extends React.PureComponent {
 
   fetchJobs = async () => {
     const { push, notify } = this.props;
+    const manifests = await fetchTestManifests(push.repository, push.revision);
     const { data, failureStatus } = await JobModel.getList(
       {
         push_id: push.id,
